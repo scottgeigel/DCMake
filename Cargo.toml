@@ -1,0 +1,8 @@
+[package]
+name = "dynamic_c_make"
+version = "0.1.0"
+authors = ["sgeigel"]
+
+license = "MIT"
+[dependencies]
+getopts = "0.2"
