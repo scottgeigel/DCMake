@@ -27,7 +27,10 @@ use std::collections::HashSet;
 use std::io;
 use std::io::Write;
 use std::io::BufRead;
+use std::io::BufReader;
 use std::process;
+use std::fs::File;
+
 pub struct DCMake {
     magic_phrase : String,
     dc_make_definition : String,
@@ -41,10 +44,34 @@ pub struct DCMakeFactory {
     product : DCMake,
 }
 
+fn start_comment_block(name : &str) -> String {
+    const comment_80 : &'static str = "////////////////////////////////////////////////////////////////////////////////\n";
+    let mut ret = String::from(comment_80);
+    let pad_size_left = (40 - (name.len()/2));
+    let pad_size_right = pad_size_left + (name.len() % 2);
+    ret.push_str(&comment_80[0..pad_size_left]);
+    ret.push_str(&name);
+    ret.push_str(&comment_80[0..pad_size_right]);
+    return ret;
+}
+
+
+fn end_comment_block(name : &str) -> String {
+    const comment_80 : &'static str = "\n////////////////////////////////////////////////////////////////////////////////";
+    let mut ret = String::new();
+    let pad_size_left = (40 - (name.len()/2));
+    let pad_size_right = pad_size_left + (name.len() % 2);
+    ret.push_str(&comment_80[1..pad_size_left]);
+    ret.push_str(&name);
+    ret.push_str(&comment_80[1..pad_size_right]);
+    ret.push_str(&comment_80);
+    return ret;
+}
+
 impl DCMake {
     fn new () -> DCMake {
         DCMake {
-            magic_phrase : String::from("require"),
+            magic_phrase : String::from("#require"),
             dc_make_definition : String::from("DYNAMICC_MODE"),
             pre_defines : HashSet::new(),
             pre_included_paths : HashSet::new(),
@@ -53,11 +80,52 @@ impl DCMake {
         }
     }
 
+    fn process_file(&mut self, path : String) -> Result<(), String> {
+        match File::open(&path.as_str()) {
+            Ok(file_handle) => {
+                let mut buffer = String::new();
+                let mut buffered_reader = BufReader::new(file_handle);
+                if !self.included_paths.insert(path.clone()) {
+                    writeln!(&mut io::stderr(), "Skipping {}", path);
+                } else {
+                    println!("{}", start_comment_block(&path.as_str()));
+                    while let Ok(bytes_read) = buffered_reader.read_line(&mut buffer) {
+                        if bytes_read > 0 {
+                            if buffer.starts_with(self.magic_phrase.as_str()) {
+                                let new_file : Vec<&str>= buffer.split(self.magic_phrase.as_str()).collect();//TODO: probably a better way
+                                self.process_file(new_file[1].trim().to_string());
+                            } else {
+                                print!("{}", buffer);
+                            }
+                            buffer.clear();
+                        } else {
+                            break;
+                        }
+                    }
+                    println!("{}", end_comment_block(&path.as_str()));
+                }
+                Ok(())
+            },
+            Err(e) => {
+                writeln!(&mut io::stderr(), "Failed to open {}\n{}", path, e).unwrap();
+                process::exit(2);
+            }
+        }
+    }
+
     pub fn make(&mut self, source : &mut BufRead) {
+
+        println!("magic phrase is {}", self.magic_phrase);
+
         let mut buffer = String::new();
         while let Ok(bytes_read) = source.read_line(&mut buffer) {
             if bytes_read > 0 {
-                println!("{}", buffer);
+                println!("{} {}", buffer, bytes_read);
+                buffer = buffer.trim().to_string();
+
+                if let Err(error_message) = self.process_file(buffer.clone()) {
+                    writeln!(&mut io::stderr(), "ERROR: failed to open {}", buffer).unwrap();
+                }
                 buffer.clear();
             } else {
                 return;

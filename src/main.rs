@@ -29,7 +29,7 @@ use std::env;
 
 mod dc_make;
 
-const PROGRAM_NAME : &'static str = env!("CARGO_PKG_NAME");
+const PROGRAM_NAME : &'static str = "derp";//env!("CARGO_PKG_NAME");
 const PROGRAM_VERSION : &'static str = env!("CARGO_PKG_VERSION");
 
 struct Variables{
