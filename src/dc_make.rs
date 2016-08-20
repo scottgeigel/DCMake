@@ -31,6 +31,8 @@ use std::io::BufReader;
 use std::process;
 use std::fs::File;
 
+//I'll be coming back to these features in the future
+#[allow(dead_code)]
 pub struct DCMake {
     magic_phrase : String,
     dc_make_definition : String,
@@ -45,26 +47,26 @@ pub struct DCMakeFactory {
 }
 
 fn start_comment_block(name : &str) -> String {
-    const comment_80 : &'static str = "////////////////////////////////////////////////////////////////////////////////\n";
-    let mut ret = String::from(comment_80);
-    let pad_size_left = (40 - (name.len()/2));
+    const COMMENT_80 : &'static str = "////////////////////////////////////////////////////////////////////////////////\n";
+    let mut ret = String::from(COMMENT_80);
+    let pad_size_left = 40 - (name.len()/2);
     let pad_size_right = pad_size_left + (name.len() % 2);
-    ret.push_str(&comment_80[0..pad_size_left]);
+    ret.push_str(&COMMENT_80[0..pad_size_left]);
     ret.push_str(&name);
-    ret.push_str(&comment_80[0..pad_size_right]);
+    ret.push_str(&COMMENT_80[0..pad_size_right]);
     return ret;
 }
 
 
 fn end_comment_block(name : &str) -> String {
-    const comment_80 : &'static str = "\n////////////////////////////////////////////////////////////////////////////////";
+    const COMMENT_80 : &'static str = "\n////////////////////////////////////////////////////////////////////////////////";
     let mut ret = String::new();
-    let pad_size_left = (40 - (name.len()/2));
+    let pad_size_left = 40 - (name.len()/2);
     let pad_size_right = pad_size_left + (name.len() % 2);
-    ret.push_str(&comment_80[1..pad_size_left]);
+    ret.push_str(&COMMENT_80[1..pad_size_left]);
     ret.push_str(&name);
-    ret.push_str(&comment_80[1..pad_size_right]);
-    ret.push_str(&comment_80);
+    ret.push_str(&COMMENT_80[1..pad_size_right]);
+    ret.push_str(&COMMENT_80);
     return ret;
 }
 
@@ -110,7 +112,7 @@ impl DCMake {
                 let mut buffered_reader = BufReader::new(file_handle);
                 //check to see if we have read this file already
                 if !self.included_paths.insert(path.clone()) {
-                    writeln!(&mut io::stderr(), "Skipping {}", path);
+                    writeln!(&mut io::stderr(), "Skipping {}", path).unwrap();
                 } else {
                     //begin file processing
                     println!("{}", start_comment_block(&path.as_str()));

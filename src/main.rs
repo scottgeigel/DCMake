@@ -32,6 +32,8 @@ mod dc_make;
 const PROGRAM_NAME : &'static str = "derp";//env!("CARGO_PKG_NAME");
 const PROGRAM_VERSION : &'static str = env!("CARGO_PKG_VERSION");
 
+//I'll be coming back to these features in the future
+#[allow(dead_code)]
 struct Variables{
     input_file_name : Option<String>,
     output_file_name : Option<String>,
@@ -47,6 +49,8 @@ fn print_usage(opts : Options) {
     println!("{}", opts.usage(&brief));
 }
 
+//I'll be coming back to this in the future
+#[allow(unused_variables)]
 fn process_arguments(opts : Options, factory : &mut dc_make::DCMakeFactory, variables : &mut Variables) {
     let args : Vec<String> = env::args().collect();
     let matches = match opts.parse(&args[1..]) {
@@ -97,6 +101,6 @@ fn main() {
     };
 
     process_arguments(opts, &mut factory, &mut variables);
-    let mut file = std::io::stdin();
+    let file = std::io::stdin();
     factory.finalize().make(&mut file.lock());
 }
