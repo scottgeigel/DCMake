@@ -81,50 +81,100 @@ impl DCMake {
     }
 
     fn process_file(&mut self, path : String) -> Result<(), String> {
+        ///takes the path included by #[magic_phrase][<|(]path_name[>|)]
+        impl DCMake {
+            fn extract_file_path(&mut self, directive : &str) -> Result<String, String> {
+                //strip the #[magic_phrase]
+                let captured_path : Vec<&str> = directive.split(self.magic_phrase.as_str()).collect();
+                let mut captured_path = captured_path[1].trim().to_string();
+                //remove any surrounding whitespace and get the substring between the surrounding "" or <>
+                //first check for ""
+                let captured_path = {
+                    if captured_path.remove(0) != '\"' {
+                        return Err(format!("Malfored expression {}. Must be enclosed with \"\" characters", directive))
+                    }
+                    let len = captured_path.len();
+                    if captured_path.remove(len - 1) != '\"' {
+                        return Err(format!("Malfored expression {}. Missing closing \" character", directive))
+                    } else {
+                        captured_path
+                    }
+                };
+                Ok(captured_path)
+            }
+        }
+        //get a handle to the file
         match File::open(&path.as_str()) {
             Ok(file_handle) => {
                 let mut buffer = String::new();
                 let mut buffered_reader = BufReader::new(file_handle);
+                //check to see if we have read this file already
                 if !self.included_paths.insert(path.clone()) {
                     writeln!(&mut io::stderr(), "Skipping {}", path);
                 } else {
+                    //begin file processing
                     println!("{}", start_comment_block(&path.as_str()));
+                    let mut line_number : usize = 0;
                     while let Ok(bytes_read) = buffered_reader.read_line(&mut buffer) {
+                        line_number += 1;
                         if bytes_read > 0 {
+                            //check to see if we have hit an include directive
                             if buffer.starts_with(self.magic_phrase.as_str()) {
-                                let new_file : Vec<&str>= buffer.split(self.magic_phrase.as_str()).collect();//TODO: probably a better way
-                                self.process_file(new_file[1].trim().to_string());
+                                let extracted_result = self.extract_file_path(buffer.as_str());
+                                if let Err(error_message) = extracted_result {
+                                    return Err(error_message);
+                                }
+                                let new_file = extracted_result.unwrap();
+                                //begin processing this file and check for errors
+                                if let Err(error_message) = self.process_file(new_file) {
+                                    //log this error
+                                    writeln!(&mut io::stderr(), "{}", error_message).unwrap();
+                                    //pass on the error for stack trace
+                                    return Err(format!("In file included from {}:{}", path, line_number));
+                                }
                             } else {
                                 print!("{}", buffer);
                             }
                             buffer.clear();
                         } else {
+                            //we are at the end of the file
                             break;
                         }
                     }
+                    //end file processing
                     println!("{}", end_comment_block(&path.as_str()));
                 }
                 Ok(())
             },
             Err(e) => {
-                writeln!(&mut io::stderr(), "Failed to open {}\n{}", path, e).unwrap();
-                process::exit(2);
+                return Err(format!("Failed to open {}\n{}", path, e));
             }
         }
     }
 
     pub fn make(&mut self, source : &mut BufRead) {
-
-        println!("magic phrase is {}", self.magic_phrase);
-
+        //DEBUG INFORMATION
+        {
+            use std::fs;
+            writeln!(io::stderr(), "magic phrase is {}", self.magic_phrase).unwrap();
+            let paths = fs::read_dir("./").unwrap();
+            writeln!(io::stderr(), "options are:").unwrap();
+            for path in paths {
+                writeln!(io::stderr(), "{}", path.unwrap().path().display()).unwrap();
+            }
+        }
+        //END DEBUG INFORMATION
         let mut buffer = String::new();
         while let Ok(bytes_read) = source.read_line(&mut buffer) {
             if bytes_read > 0 {
-                println!("{} {}", buffer, bytes_read);
+                //DEBUG INFORMATION
+                writeln!(io::stderr(), "{} {}", buffer, bytes_read).unwrap();
+                //END DEBUG INFORMATION
+
                 buffer = buffer.trim().to_string();
 
                 if let Err(error_message) = self.process_file(buffer.clone()) {
-                    writeln!(&mut io::stderr(), "ERROR: failed to open {}", buffer).unwrap();
+                    writeln!(&mut io::stderr(), "{}\nERROR: failed to process {}", error_message, buffer).unwrap();
                 }
                 buffer.clear();
             } else {
